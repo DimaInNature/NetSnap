@@ -1,10 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFrameworks>net5.0</TargetFrameworks>
+		<Configuration>Release</Configuration>
+		<RootNamespace>NetSnap</RootNamespace>
+		<Authors>DimaInNature</Authors>
+		<PackageId>NetSnap</PackageId>
+		<Version>1.0.0</Version>
+		<RepositoryUrl>https://github.com/DimaInNature/NetSnap</RepositoryUrl>
+		<Description>A CLI tool for creating snapshots of .NET project structure and content.</Description>
+		<PackageTags>CLI, .NET, Snapshot, Project</PackageTags>
+		<PackAsTool>true</PackAsTool>
+		<ToolCommandName>netsnap</ToolCommandName>
+	</PropertyGroup>
 
 </Project>
