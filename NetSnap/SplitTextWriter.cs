@@ -14,10 +14,9 @@ internal sealed class SplitTextWriter : TextWriter
 
     public SplitTextWriter(string baseFilePath, long maxBytes)
     {
-        if (string.IsNullOrWhiteSpace(baseFilePath))
-            throw new ArgumentException("Base file path is empty.", nameof(baseFilePath));
-        if (maxBytes <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxBytes), "Max bytes must be > 0.");
+        if (string.IsNullOrWhiteSpace(baseFilePath)) throw new ArgumentException("Base file path is empty.", nameof(baseFilePath));
+
+        if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes), "Max bytes must be > 0.");
 
         _baseFilePath = Path.GetFullPath(baseFilePath);
         _maxBytes = maxBytes;
@@ -38,6 +37,7 @@ internal sealed class SplitTextWriter : TextWriter
     public override void Write(ReadOnlySpan<char> buffer)
     {
         if (buffer.IsEmpty) return;
+
         WriteChunked(buffer);
     }
 
@@ -57,47 +57,48 @@ internal sealed class SplitTextWriter : TextWriter
 
     private void WriteChunked(ReadOnlySpan<char> span)
     {
-        while (!span.IsEmpty)
+        while (span.IsEmpty is false)
         {
             EnsureWriter();
 
             var remaining = _maxBytes - _bytesWritten;
+
             if (remaining <= 0)
             {
                 Rotate();
+
                 continue;
             }
 
             // Find biggest prefix that fits into remaining bytes.
             // Binary search length in chars.
-            int lo = 1;
-            int hi = span.Length;
-            int bestLen = 0;
+            var lo = 1;
+            var hi = span.Length;
+            var bestLen = 0;
 
             while (lo <= hi)
             {
                 int mid = lo + ((hi - lo) / 2);
+
                 var bytes = _encoding.GetByteCount(span[..mid]);
 
                 if (bytes <= remaining)
                 {
-                    bestLen = mid;
-                    lo = mid + 1;
+                    bestLen = mid; lo = mid + 1;
                 }
-                else
-                {
-                    hi = mid - 1;
-                }
+                else hi = mid - 1;   
             }
 
             // Edge case: cannot fit even 1 char (very small remaining) -> rotate.
             if (bestLen == 0)
             {
                 Rotate();
+
                 continue;
             }
 
             var chunk = span[..bestLen];
+
             _writer!.Write(chunk);
             _bytesWritten += _encoding.GetByteCount(chunk);
 
@@ -108,6 +109,7 @@ internal sealed class SplitTextWriter : TextWriter
     private void EnsureWriter()
     {
         if (_writer is not null) return;
+
         OpenPart(_part);
     }
 
@@ -118,15 +120,17 @@ internal sealed class SplitTextWriter : TextWriter
         _writer = null;
 
         _part++;
+
         OpenPart(_part);
     }
 
     private void OpenPart(int part)
     {
         var path = GetPartPath(part);
+
         var dir = Path.GetDirectoryName(path);
-        if (!string.IsNullOrWhiteSpace(dir))
-            Directory.CreateDirectory(dir);
+
+        if (string.IsNullOrWhiteSpace(dir) is false) Directory.CreateDirectory(dir);
 
         _writer = new StreamWriter(
             File.Open(path, FileMode.Create, FileAccess.Write, FileShare.Read),
@@ -140,10 +144,10 @@ internal sealed class SplitTextWriter : TextWriter
     {
         if (part <= 1) return _baseFilePath;
 
-        var dir = Path.GetDirectoryName(_baseFilePath) ?? "";
+        var directory = Path.GetDirectoryName(_baseFilePath) ?? "";
         var name = Path.GetFileNameWithoutExtension(_baseFilePath);
-        var ext = Path.GetExtension(_baseFilePath);
+        var extension = Path.GetExtension(_baseFilePath);
 
-        return Path.Combine(dir, $"{name}_{part}{ext}");
+        return Path.Combine(directory, $"{name}_{part}{extension}");
     }
 }

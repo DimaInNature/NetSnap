@@ -6,7 +6,7 @@ public sealed class SnapshotGeneratorTests
     public void CreateSnapshot_ShouldReturnMessage_WhenNoCsprojFiles()
     {
         // Arrange
-        var testDirectory = CreateTestDirectory();
+        var testDirectory = TestHelpers.CreateTestDirectory();
 
         // Act
         var result = SnapshotGenerator.CreateSnapshot(testDirectory, "output.txt");
@@ -22,11 +22,14 @@ public sealed class SnapshotGeneratorTests
     public void CreateSnapshot_ShouldIncludeCsprojFiles_AndRelevantFiles()
     {
         // Arrange
-        var testDirectory = CreateTestDirectory();
+        var testDirectory = TestHelpers.CreateTestDirectory();
+
         var csprojPath = Path.Combine(testDirectory, "TestProject.csproj");
         File.WriteAllText(csprojPath, "<Project></Project>");
+
         var sourceFile = Path.Combine(testDirectory, "Program.cs");
         File.WriteAllText(sourceFile, "class Program { static void Main() {} }");
+
         var ignoredFile = Path.Combine(testDirectory, "snapshot.txt");
         File.WriteAllText(ignoredFile, "Should be ignored");
 
@@ -86,12 +89,103 @@ public sealed class SnapshotGeneratorTests
         Assert.True(result);
     }
 
-    private static string CreateTestDirectory()
+    [Fact]
+    public void GetProjectFiles_ShouldIgnoreHiddenFolders_AndExtraIgnoredDirectory()
     {
-        var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var root = TestHelpers.CreateTempDirectory();
 
-        Directory.CreateDirectory(tempPath);
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "A"));
+            File.WriteAllText(Path.Combine(root, "A", "A.csproj"), "<Project></Project>");
 
-        return tempPath;
+            Directory.CreateDirectory(Path.Combine(root, ".hidden"));
+            File.WriteAllText(Path.Combine(root, ".hidden", "Hidden.csproj"), "<Project></Project>");
+
+            Directory.CreateDirectory(Path.Combine(root, "out"));
+            File.WriteAllText(Path.Combine(root, "out", "Out.csproj"), "<Project></Project>");
+
+            var projects = SnapshotGenerator.GetProjectFiles(root, extraIgnoredDirectory: "out");
+
+            Assert.Single(projects);
+            Assert.EndsWith("A.csproj", projects[0], StringComparison.OrdinalIgnoreCase);
+        }
+        finally { TestHelpers.SafeDelete(root); }
+    }
+
+    [Fact]
+    public void IsIgnoredFile_ShouldIgnoreOutputFile_AndSplitParts()
+    {
+        var root = TestHelpers.CreateTempDirectory();
+        try
+        {
+            var ignoredFiles = new[] { ".gitattributes", ".gitignore", "snapshot.txt" };
+
+            var outFull = Path.Combine(root, "snapshot.txt");
+
+            Assert.True(SnapshotGenerator.IsIgnoredFile(outFull, root, ignoredFiles, outFull));
+
+            var part2 = Path.Combine(root, "snapshot_2.txt");
+
+            Assert.True(SnapshotGenerator.IsIgnoredFile(part2, root, ignoredFiles, outFull));
+
+            var nonNumeric = Path.Combine(root, "snapshot_abc.txt");
+
+            Assert.False(SnapshotGenerator.IsIgnoredFile(nonNumeric, root, ignoredFiles, outFull));
+        }
+        finally { TestHelpers.SafeDelete(root); }
+    }
+
+    [Fact]
+    public void CreateSnapshot_ShouldNotIncludeIgnoredExtensions()
+    {
+        var root = TestHelpers.CreateTempDirectory();
+
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "Test.csproj"), "<Project></Project>");
+            File.WriteAllText(Path.Combine(root, "Program.cs"), "class Program {}");
+            File.WriteAllText(Path.Combine(root, "image.jpeg"), "fake");
+
+            var result = SnapshotGenerator.CreateSnapshot(root, outputFile: Path.Combine(root, "out.txt"));
+
+            Assert.Contains("Test.csproj", result);
+            Assert.Contains("Program.cs", result);
+            Assert.DoesNotContain("image.jpeg", result);
+        }
+        finally { TestHelpers.SafeDelete(root); }
+    }
+
+    [Fact]
+    public void WriteAllProjectsSnapshot_ShouldWriteProjectHeaders()
+    {
+        var root = TestHelpers.CreateTempDirectory();
+
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "P1.csproj"), "<Project></Project>");
+            File.WriteAllText(Path.Combine(root, "P2.csproj"), "<Project></Project>");
+            File.WriteAllText(Path.Combine(root, "Program.cs"), "class X {}");
+
+            var projects = SnapshotGenerator.GetProjectFiles(root, extraIgnoredDirectory: null);
+
+            Assert.Equal(2, projects.Length);
+
+            var writer = new StringWriter();
+
+            SnapshotGenerator.WriteAllProjectsSnapshot(
+                sourcePath: root,
+                projectFiles: projects,
+                writer: writer,
+                outputFileForIgnore: Path.Combine(root, "snapshot.txt"),
+                extraIgnoredDirectory: null
+            );
+
+            var text = writer.ToString();
+
+            Assert.Contains("### Project: P1.csproj ###", text);
+            Assert.Contains("### Project: P2.csproj ###", text);
+        }
+        finally { TestHelpers.SafeDelete(root); }
     }
 }

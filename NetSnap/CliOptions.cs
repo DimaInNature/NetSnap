@@ -7,7 +7,9 @@ internal sealed class CliOptions
     public required string OutputPath { get; init; }
 
     public long? SplitMaxBytes { get; init; }
+
     public bool ByCsproj { get; init; }
+
     public bool ShowHelp { get; init; }
 
     public static CliOptions Parse(string[] args)
@@ -47,6 +49,7 @@ internal sealed class CliOptions
                 var eq = argument.IndexOf('=');
 
                 string sizeArg;
+
                 if (eq >= 0)
                 {
                     sizeArg = argument[(eq + 1)..].Trim();
@@ -60,17 +63,14 @@ internal sealed class CliOptions
                 }
 
                 splitBytes = ParseSizeToBytes(sizeArg);
-                if (splitBytes <= 0)
-                    throw new ArgumentException("Invalid --split size. Must be > 0.");
+
+                if (splitBytes <= 0) throw new ArgumentException("Invalid --split size. Must be > 0.");
 
                 continue;
             }
 
-            if (argument.StartsWith("--", StringComparison.Ordinal))
-            {
-                throw new ArgumentException($"Unknown option: {argument}");
-            }
-
+            if (argument.StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException($"Unknown option: {argument}");
+            
             positional.Add(argument);
         }
 
@@ -126,9 +126,9 @@ internal sealed class CliOptions
 
         if (string.IsNullOrEmpty(extension)) return Path.GetFullPath(OutputPath);
 
-        var dir = Path.GetDirectoryName(Path.GetFullPath(OutputPath));
+        var directory = Path.GetDirectoryName(Path.GetFullPath(OutputPath));
 
-        return string.IsNullOrWhiteSpace(dir) ? Path.GetFullPath(Directory.GetCurrentDirectory()) : dir!;
+        return string.IsNullOrWhiteSpace(directory) ? Path.GetFullPath(Directory.GetCurrentDirectory()) : directory!;
     }
 
     public static bool IsPathInside(string root, string candidate)
@@ -157,14 +157,12 @@ internal sealed class CliOptions
 
     private static long ParseSizeToBytes(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            throw new ArgumentException("Empty size value for --split.");
+        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("Empty size value for --split.");
 
         var trimmed = value.Trim();
 
         // pure bytes
-        if (long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytesOnly))
-            return bytesOnly;
+        if (long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytesOnly)) return bytesOnly;
 
         trimmed = trimmed.Replace(" ", "", StringComparison.Ordinal);
 
