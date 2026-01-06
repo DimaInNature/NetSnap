@@ -1,44 +1,111 @@
-﻿using System;
-using System.IO;
+﻿CliOptions options;
 
-namespace NetSnap
+try
 {
-    public static class Program
+    options = CliOptions.Parse(args);
+
+    if (options.ShowHelp)
     {
-        public static void Main(string[] args)
-        {
-            var sourcePath = args.Length > 0 ? args[0] : GetSourcePath();
-            var outputFile = args.Length > 1 ? args[1] : Path.Combine(sourcePath, "snapshot.txt");
+        CliOptions.PrintHelp();
 
-            if (!Directory.Exists(sourcePath))
-            {
-                Console.WriteLine($"Error: The path '{sourcePath}' does not exist.");
-                return;
-            }
-
-            try
-            {
-#if DEBUG
-                Console.WriteLine("Running in DEBUG mode...");
-#endif
-                var snapshot = SnapshotGenerator.CreateSnapshot(sourcePath, outputFile);
-                File.WriteAllText(outputFile, snapshot);
-
-                Console.WriteLine($"Snapshot saved to {outputFile}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-            }
-        }
-
-        private static string GetSourcePath()
-        {
-#if DEBUG
-            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\..\..\"));
-#else
-            return Directory.GetCurrentDirectory();
-#endif
-        }
+        return;
     }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error: {ex.Message}");
+    Console.WriteLine("Use --help to see usage.");
+
+    return;
+}
+
+if (Directory.Exists(options.SourcePath) is false)
+{
+    Console.WriteLine($"Error: The path '{options.SourcePath}' does not exist.");
+
+    return;
+}
+
+try
+{
+#if DEBUG
+    Console.WriteLine("Running in DEBUG mode...");
+#endif
+
+    if (options.ByCsproj)
+    {
+        var outDir = options.ResolveOutputDirectory();
+
+        Directory.CreateDirectory(outDir);
+
+        var extraIgnoreDir = CliOptions.GetTopLevelDirNameIfInside(options.SourcePath, outDir);
+
+        var projects = SnapshotGenerator.GetProjectFiles(options.SourcePath, extraIgnoreDir);
+
+        if (projects.Length == 0)
+        {
+            Console.WriteLine("No .csproj files found in the specified directory.");
+
+            return;
+        }
+
+        foreach (var csproj in projects)
+        {
+            var baseName = Path.GetFileNameWithoutExtension(csproj);
+            var baseFile = Path.Combine(outDir, $"{baseName}.txt");
+
+            using TextWriter writer = options.SplitMaxBytes is long max
+                ? new SplitTextWriter(baseFile, max)
+                : new StreamWriter(baseFile, append: false, new UTF8Encoding(false));
+
+            SnapshotGenerator.WriteProjectSnapshot(
+                sourcePath: options.SourcePath,
+                projectFile: csproj,
+                writer: writer,
+                outputFileForIgnore: baseFile,
+                extraIgnoredDirectory: extraIgnoreDir
+            );
+
+            writer.Flush();
+        }
+
+        Console.WriteLine($"Snapshots saved to {outDir}");
+    }
+    else
+    {
+        var outputFile = Path.GetFullPath(options.OutputPath);
+
+        var outDir = Path.GetDirectoryName(outputFile) ?? options.SourcePath;
+
+        var extraIgnoreDir = CliOptions.GetTopLevelDirNameIfInside(options.SourcePath, outDir);
+
+        var projects = SnapshotGenerator.GetProjectFiles(options.SourcePath, extraIgnoreDir);
+
+        if (projects.Length == 0)
+        {
+            Console.WriteLine("No .csproj files found in the specified directory.");
+
+            return;
+        }
+
+        using TextWriter writer = options.SplitMaxBytes is long max
+            ? new SplitTextWriter(outputFile, max)
+            : new StreamWriter(outputFile, append: false, new UTF8Encoding(false));
+
+        SnapshotGenerator.WriteAllProjectsSnapshot(
+            sourcePath: options.SourcePath,
+            projectFiles: projects,
+            writer: writer,
+            outputFileForIgnore: outputFile,
+            extraIgnoredDirectory: extraIgnoreDir
+        );
+
+        writer.Flush();
+
+        Console.WriteLine($"Snapshot saved to {outputFile}");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error: {ex.Message}");
 }
