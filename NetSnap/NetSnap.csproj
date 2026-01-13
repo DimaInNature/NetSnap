@@ -7,7 +7,7 @@
 		<RootNamespace>NetSnap</RootNamespace>
 		<Authors>DimaInNature</Authors>
 		<PackageId>NetSnap</PackageId>
-		<Version>1.1.0</Version>
+		<Version>1.1.1</Version>
 		<RepositoryUrl>https://github.com/DimaInNature/NetSnap</RepositoryUrl>
 		<Description>A CLI tool for creating snapshots of .NET project structure and content.</Description>
 		<PackageTags>CLI, .NET, Snapshot, Project</PackageTags>

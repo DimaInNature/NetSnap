@@ -6,7 +6,7 @@ public static class SnapshotGenerator
 
     private static readonly string[] DefaultIgnoredFiles = [".gitattributes", ".gitignore", "snapshot.txt"];
 
-    private static readonly string[] DefaultIgnoredExtensions = [".img", ".jpeg", ".webp"];
+    private static readonly string[] DefaultIgnoredExtensions = [".img", ".jpeg", ".webp", ".dll", ".zip", ".pdf", ".ico", ".bmp", ".gif", ".jpg", ".exe", ".pdb", ".so", ".dylib", ".wasm", ".ttf", ".otf", ".woff", ".woff2"];
 
     public static string CreateSnapshot(string sourcePath, string outputFile)
     {
